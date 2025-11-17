@@ -8,5 +8,14 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
+    // Установка ключей для OCR
+    val keyPath = Application::class.java
+        .classLoader
+        .getResource("google-vision-key.json")!!.path
+
+    System.setProperty(
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        keyPath
+    )
     configureRouting()
 }
