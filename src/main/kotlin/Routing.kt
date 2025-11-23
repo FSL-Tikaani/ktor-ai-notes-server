@@ -1,5 +1,6 @@
 package com.tikaani
 
+
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -13,7 +14,6 @@ import io.ktor.client.request.setBody
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
-import io.ktor.http.contentType
 import io.ktor.serialization.gson.gson
 import io.ktor.server.application.*
 import io.ktor.server.request.receiveMultipart
@@ -21,10 +21,17 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.copyAndClose
+import kotlinx.serialization.json.Json
+import java.awt.BasicStroke
+import java.awt.Color
+import java.awt.Graphics2D
+import java.awt.image.BufferedImage
 import java.io.File
 import java.lang.Exception
 import java.util.Base64
 import java.util.UUID
+import javax.imageio.ImageIO
+
 
 fun Application.configureRouting() {
     routing {
@@ -54,6 +61,7 @@ fun Application.configureRouting() {
 
                 if (statusOcr.isSuccessfully){
                     call.respondText("OCR complete! Extracted Text: ${statusOcr.extractedText}")
+                    getModifiedPhoto(statusOcr.extractedText, statusUpload.fileName)
                     println("OCR complete! Extracted Text: ${statusOcr.extractedText}")
                 }else{
                     call.respondText("OCR failed! Error: ${statusOcr.error}")
@@ -64,7 +72,71 @@ fun Application.configureRouting() {
                 println("Error with uploading file, error:${statusUpload.error}")
             }
         }
+
     }
+}
+
+fun getModifiedPhoto(extractedText: String, fileName: String){
+    // 1. Парсим JSON ответ от API
+    val jsonString = extractedText
+
+    val jsonParser = Json {
+        ignoreUnknownKeys = true
+    }
+
+
+    val ocrResponse = jsonParser.decodeFromString<TextAnnotationResponse>(jsonString)
+
+// 2. Получаем блоки данных
+    val blocks = ocrResponse.result.textAnnotation.blocks
+
+// 3. Вызываем функцию рисования
+    val result = drawBoundingBoxes(fileName, blocks)
+
+// 4. Проверяем результат
+    if (result.isSuccessfully) {
+        println("Успешно нарисовали bounding boxes!")
+    } else {
+        println("Ошибка: ${result.error}")
+    }
+}
+
+
+fun drawBoundingBoxes(fileName: String, blocks: List<BlockData>): GenerateBoxesStatus{
+    val status = GenerateBoxesStatus()
+    try {
+        val image: BufferedImage = ImageIO.read(File("UploadsData/$fileName"))
+        val graphics: Graphics2D = image.createGraphics()
+
+        // Настройки рисования
+        graphics.color = Color.RED
+        graphics.stroke = BasicStroke(1.0f)
+
+        blocks.forEach { block ->
+            // Рисуем boundingBox для блока
+            drawPolygon(graphics, block.boundingBox.vertices)
+
+            // Рисуем boundingBox для каждой линии
+            block.lines.forEach { line ->
+                drawPolygon(graphics, line.boundingBox.vertices)
+            }
+        }
+
+        graphics.dispose()
+        ImageIO.write(image, "jpg", File("OutputData/$fileName"))
+        status.isSuccessfully = true
+    }
+    catch (e: Exception){
+        status.error = e.message.toString()
+    }
+
+    return status
+}
+
+private fun drawPolygon(graphics: Graphics2D, vertices: List<Vertex>) {
+    val xPoints = vertices.map { it.x.toInt() }.toIntArray()
+    val yPoints = vertices.map { it.y.toInt() }.toIntArray()
+    graphics.drawPolygon(xPoints, yPoints, vertices.size)
 }
 
 
@@ -125,6 +197,7 @@ suspend fun getOCRFromGoogleAPI(fileName: String): OCRStatus {
             ocrStatus.extractedText = response.fullTextAnnotation.text
         }
     }
+
     catch (e: Exception){
         println("Error with OCR Google: ${e.message.toString()}")
         ocrStatus.error = e.message.toString()

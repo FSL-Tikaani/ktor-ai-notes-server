@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
+    kotlin("plugin.serialization") version "1.9.22"
 }
 
 kotlin {
@@ -22,10 +23,12 @@ application {
 dependencies {
     implementation("io.ktor:ktor-client-core:3.3.2")
     implementation("io.ktor:ktor-client-cio:3.3.2")
-    implementation("io.ktor:ktor-serialization-gson:3.3.2")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.2")
     implementation("io.ktor:ktor-client-content-negotiation:3.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("io.ktor:ktor-serialization-gson:3.3.2")
     implementation("io.github.cdimascio:dotenv-kotlin:6.4.1")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.logback.classic)
