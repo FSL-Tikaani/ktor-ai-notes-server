@@ -8,6 +8,8 @@ import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import com.google.cloud.vision.v1.*
 import com.google.protobuf.ByteString
+import com.tikaani.database.DatabaseFactory
+import com.tikaani.database.UsersTable
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.call.body
 import io.ktor.client.request.headers
@@ -25,6 +27,11 @@ import io.ktor.server.routing.*
 import io.ktor.util.cio.writeChannel
 import io.ktor.utils.io.copyAndClose
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Graphics2D
@@ -42,6 +49,26 @@ fun Application.configureRouting() {
     routing {
         get("/") {
             call.respondText("Server is running!")
+        }
+        post("/register"){
+            try {
+                val user = call.receive<UserCredentials>()
+
+                if(user.username.isBlank() || user.password.isBlank()){
+                    call.respond(HttpStatusCode.BadRequest, "username and password cannot be blank!")
+                    return@post
+                }
+
+                val isCreated = createUser(user)
+
+                if(isCreated){
+                    call.respond(HttpStatusCode.Created, "created")
+                }else {
+                    call.respond(HttpStatusCode.InternalServerError,"error while creating user!")
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.BadRequest, "error while creating user!, ${e.message}")
+            }
         }
         post("/login") {
             val user = call.receive<UserCredentials>()
@@ -298,7 +325,21 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
     return ocrStatus
 }
 
-fun isUserValid(userCredentials: UserCredentials): Boolean {
-    // TODO: Сделать валидацию данных через БД
-    return true
+suspend fun isUserValid(userCredentials: UserCredentials): Boolean {
+    return DatabaseFactory.dbQuery {
+        UsersTable.selectAll().where {
+            (UsersTable.username eq userCredentials.username) and (UsersTable.password eq userCredentials.password)
+        }.count() > 0
+    }
+}
+
+suspend fun createUser(user: UserCredentials): Boolean {
+    return DatabaseFactory.dbQuery {
+        val insertStatement = UsersTable.insert {
+            it[username] = user.username
+            it[password] = user.password
+        }
+        // Если вставленная строка не пустая, значит операция прошла успешно
+        insertStatement.insertedCount > 0
+    }
 }

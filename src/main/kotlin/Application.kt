@@ -7,12 +7,15 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.tikaani.database.DatabaseFactory
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain.main(args)
 }
 
 fun Application.module() {
+    DatabaseFactory.init()
+
     install(ContentNegotiation) {
         json()
     }

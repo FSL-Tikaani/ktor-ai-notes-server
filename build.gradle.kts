@@ -21,6 +21,10 @@ application {
 }
 
 val ktor_version = "2.3.8"
+val exposed_version = "0.55.0"
+val h2_version = "2.4.240"
+val hikari_version = "7.0.2"
+
 dependencies {
     implementation("io.ktor:ktor-client-core:3.3.2")
     implementation("io.ktor:ktor-client-cio:3.3.2")
@@ -34,6 +38,17 @@ dependencies {
 
     implementation("io.ktor:ktor-server-auth:${ktor_version}")
     implementation("io.ktor:ktor-server-auth-jwt:${ktor_version}")
+
+    // Библиотеки для работы с БД
+    implementation("org.jetbrains.exposed:exposed-core:$exposed_version")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposed_version")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposed_version")
+
+    // Сама база данных H2
+    implementation("com.h2database:h2:$h2_version")
+
+    // Менеджер соединений
+    implementation("com.zaxxer:HikariCP:$hikari_version")
 
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
