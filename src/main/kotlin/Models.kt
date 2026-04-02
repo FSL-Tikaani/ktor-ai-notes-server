@@ -1,6 +1,5 @@
 package com.tikaani
 
-import com.google.gson.annotations.SerializedName
 import kotlinx.serialization.Serializable
 
 data class UploadFileStatus(
@@ -18,6 +17,12 @@ data class OCRStatus(
 data class GenerateBoxesStatus(
     var isSuccessfully: Boolean = false,
     var error: String = "",
+)
+
+@Serializable
+data class UserCredentials(
+    val username: String,
+    val password: String,
 )
 
 @Serializable
