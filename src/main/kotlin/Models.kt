@@ -2,6 +2,7 @@ package com.tikaani
 
 import kotlinx.serialization.Serializable
 
+
 data class UploadFileStatus(
     var isSuccessfully: Boolean = false,
     var fileName: String = "",

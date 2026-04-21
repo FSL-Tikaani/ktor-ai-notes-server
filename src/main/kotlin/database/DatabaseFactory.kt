@@ -20,12 +20,12 @@ object DatabaseFactory {
                 SchemaUtils.create(UsersTable)
             }
         }catch (e: Exception){
-            println("Ошибка создания таблицы в базе данных")
+            println("Error while creating tables:")
             e.printStackTrace()
         }
     }
 
-    // Это функция-помощник. Любой запрос к БД мы будем оборачивать в нее
+    // Функция для обёртки запросов
     suspend fun <T> dbQuery(block: suspend () -> T): T =
         newSuspendedTransaction(Dispatchers.IO) { block() }
 }

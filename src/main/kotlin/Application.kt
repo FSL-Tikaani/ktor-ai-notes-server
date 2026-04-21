@@ -24,19 +24,22 @@ fun Application.module() {
     configureRouting()
 }
 
+object JwtConfig {
+    const val secretEncryptKey = "HARDCODE SECRET PHRASE"
+    const val issuer = "ktor-server"
+    const val audience = "android-app"
+    const val myRealm = "api-authentication"
+}
+
 fun Application.configureSecurity(){
-    val secretEncryptKey = "HARDCODE SECRET PHRASE"
-    val issuer = "ktor-server"
-    val audience = "android-app"
-    val myRealm = "api-authentication"
 
     install(Authentication){
         jwt("auth-jwt"){
-            realm = myRealm
+            realm = JwtConfig.myRealm
             verifier (
-                JWT.require(Algorithm.HMAC256(secretEncryptKey))
-                    .withAudience(audience)
-                    .withIssuer(issuer)
+                JWT.require(Algorithm.HMAC256(JwtConfig.secretEncryptKey))
+                    .withAudience(JwtConfig.audience)
+                    .withIssuer(JwtConfig.issuer)
                     .build()
             )
             validate { credential ->
