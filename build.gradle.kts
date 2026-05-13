@@ -55,6 +55,9 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.config.yaml)
+    implementation("io.ktor:ktor-server-core:3.3.2")
+    implementation("io.ktor:ktor-server-double-receive:3.3.2")
+    implementation("io.ktor:ktor-server-core:3.3.2")
 
 
     testImplementation(libs.ktor.server.test.host)

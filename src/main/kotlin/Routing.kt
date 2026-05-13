@@ -3,6 +3,7 @@ package com.tikaani
 
 import com.tikaani.routes.authRoutes
 import com.tikaani.routes.uploadRoutes
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.*
@@ -18,6 +19,10 @@ fun Application.configureRouting() {
         authRoutes()
         // Доступны только с авторизацией
         authenticate("auth-jwt") {
+            // Вернем 200 если токен, который приходит в заголовке, действителен
+            get("/auth/check-token"){
+                call.respond(HttpStatusCode.OK)
+            }
             uploadRoutes()
         }
     }

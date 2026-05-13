@@ -22,8 +22,20 @@ data class GenerateBoxesStatus(
 
 @Serializable
 data class UserCredentials(
-    val username: String,
+    val login: String,
     val password: String,
+)
+
+@Serializable
+data class UserDataCredentials(
+    val id: Int,
+    val name: String,
+    val surname: String,
+    val isEmailConfirmed: Boolean,
+    val avatar: String,
+    val studyYear: Int,
+    val numberDiscipline: Int,
+    val numberNotes: Int,
 )
 
 @Serializable

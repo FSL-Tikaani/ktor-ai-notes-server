@@ -8,6 +8,7 @@ import io.ktor.server.auth.jwt.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.tikaani.database.DatabaseFactory
+import io.ktor.server.plugins.doublereceive.DoubleReceive
 
 fun main(args: Array<String>) {
     io.ktor.server.netty.EngineMain.main(args)
@@ -19,6 +20,8 @@ fun Application.module() {
     install(ContentNegotiation) {
         json()
     }
+
+    install(DoubleReceive)
 
     configureSecurity()
     configureRouting()

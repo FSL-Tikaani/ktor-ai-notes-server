@@ -18,6 +18,7 @@ object DatabaseFactory {
         try {
             transaction(database) {
                 SchemaUtils.create(UsersTable)
+                SchemaUtils.create(UsersDataTable)
             }
         }catch (e: Exception){
             println("Error while creating tables:")

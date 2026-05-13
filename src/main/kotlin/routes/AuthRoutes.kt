@@ -4,7 +4,9 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.tikaani.JwtConfig
 import com.tikaani.UserCredentials
+import com.tikaani.UserDataCredentials
 import com.tikaani.database.createUser
+import com.tikaani.database.createUserData
 import com.tikaani.database.isUserValid
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -16,10 +18,15 @@ import java.lang.Exception
 import java.util.Date
 
 fun Route.authRoutes() {
-    post("/register") {
+    post("auth/register") {
         handleRegistration(call)
     }
-    post("/login") {
+    post("auth/registerUserData") {
+        handleRegistrationUserData(call)
+    }
+    post("auth/login") {
+        println("auth/login data:")
+        println(call.receive<UserCredentials>().login)
         handleLogin(call)
     }
 }
@@ -28,7 +35,7 @@ suspend fun handleRegistration(call: ApplicationCall) {
     try {
         val user = call.receive<UserCredentials>()
 
-        if (user.username.isBlank() || user.password.isBlank()) {
+        if (user.login.isBlank() || user.password.isBlank()) {
             call.respond(HttpStatusCode.BadRequest, "Username and password cannot be blank!")
             return
         }
@@ -45,11 +52,28 @@ suspend fun handleRegistration(call: ApplicationCall) {
     }
 }
 
+suspend fun handleRegistrationUserData(call: ApplicationCall) {
+    try {
+        val userData = call.receive<UserDataCredentials>()
+        val authHeader = call.request.headers["Authorization"]
+        val token = authHeader?.removePrefix("Bearer ") + ""
+
+
+        if (userData.name.isBlank() || userData.surname.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, "Name and Surname cannot be blank!")
+            return
+        }
+
+    } catch (e: Exception) {
+        call.respond(HttpStatusCode.BadRequest, "Error:: ${e.message}")
+    }
+}
+
 fun createToken(user: UserCredentials): String {
     val token = JWT.create()
         .withAudience(JwtConfig.audience)
         .withIssuer(JwtConfig.issuer)
-        .withClaim("username", user.username)
+        .withClaim("username", user.login)
         // Выдаем токен на 1 час
         .withExpiresAt(Date(System.currentTimeMillis() + 3600000))
         .sign(Algorithm.HMAC256(JwtConfig.secretEncryptKey))
@@ -61,7 +85,7 @@ suspend fun handleLogin(call: ApplicationCall){
     try {
         val user = call.receive<UserCredentials>()
 
-        if (user.username.isBlank() || user.password.isBlank()) {
+        if (user.login.isBlank() || user.password.isBlank()) {
             call.respond(HttpStatusCode.BadRequest, "Username and password cannot be blank!")
             return
         }
