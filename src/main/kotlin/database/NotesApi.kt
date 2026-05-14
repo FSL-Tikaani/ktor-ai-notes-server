@@ -1,0 +1,97 @@
+package com.tikaani.database
+
+import com.tikaani.CreateNoteRequest
+import com.tikaani.NoteResponse
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+private val FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+/** Создать заметку и вернуть её полное представление. */
+suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
+    return DatabaseFactory.dbQuery {
+        // Проверяем, что дисциплина принадлежит этому пользователю
+        val discipline = DisciplinesTable.selectAll()
+            .where { DisciplinesTable.id eq request.disciplineId }
+            .firstOrNull() ?: return@dbQuery null
+
+        if (discipline[DisciplinesTable.userId] != userId) return@dbQuery null
+
+        val now = LocalDateTime.now().format(FORMATTER)
+
+        val inserted = NotesTable.insert {
+            it[NotesTable.userId]       = userId
+            it[NotesTable.disciplineId] = request.disciplineId
+            it[topic]                   = request.topic
+            it[title]                   = request.title
+            it[content]                 = request.content
+            it[fileType]                = request.fileType
+            it[createdAt]               = now
+        }
+
+        NoteResponse(
+            id             = inserted[NotesTable.id],
+            disciplineId   = request.disciplineId,
+            disciplineName = discipline[DisciplinesTable.name],
+            topic          = request.topic,
+            title          = request.title,
+            content        = request.content,
+            fileType       = request.fileType,
+            createdAt      = now,
+        )
+    }
+}
+
+/** Список всех заметок пользователя (без content, для списка). */
+suspend fun getNotesByUser(userId: Int): List<NoteResponse> {
+    return DatabaseFactory.dbQuery {
+        NotesTable.selectAll()
+            .where { NotesTable.userId eq userId }
+            .orderBy(NotesTable.id to org.jetbrains.exposed.sql.SortOrder.DESC)
+            .map { row ->
+                val discName = DisciplinesTable.selectAll()
+                    .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
+                    .firstOrNull()
+                    ?.get(DisciplinesTable.name) ?: ""
+
+                NoteResponse(
+                    id             = row[NotesTable.id],
+                    disciplineId   = row[NotesTable.disciplineId],
+                    disciplineName = discName,
+                    topic          = row[NotesTable.topic],
+                    title          = row[NotesTable.title],
+                    content        = row[NotesTable.content],
+                    fileType       = row[NotesTable.fileType],
+                    createdAt      = row[NotesTable.createdAt],
+                )
+            }
+    }
+}
+
+/** Получить одну заметку по id (только если она принадлежит пользователю). */
+suspend fun getNoteById(userId: Int, noteId: Int): NoteResponse? {
+    return DatabaseFactory.dbQuery {
+        val row = NotesTable.selectAll()
+            .where { (NotesTable.id eq noteId) and (NotesTable.userId eq userId) }
+            .firstOrNull() ?: return@dbQuery null
+
+        val discName = DisciplinesTable.selectAll()
+            .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
+            .firstOrNull()
+            ?.get(DisciplinesTable.name) ?: ""
+
+        NoteResponse(
+            id             = row[NotesTable.id],
+            disciplineId   = row[NotesTable.disciplineId],
+            disciplineName = discName,
+            topic          = row[NotesTable.topic],
+            title          = row[NotesTable.title],
+            content        = row[NotesTable.content],
+            fileType       = row[NotesTable.fileType],
+            createdAt      = row[NotesTable.createdAt],
+        )
+    }
+}

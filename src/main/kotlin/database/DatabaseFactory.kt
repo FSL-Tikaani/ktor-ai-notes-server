@@ -7,26 +7,43 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object DatabaseFactory {
-    fun init(){
-        val database = Database.connect(
-            url = "jdbc:h2:file:./db/testdb",
-            driver = "org.h2.Driver",
-            user = "root",
-            password = ""
-        )
+
+    // Позволяет тестам подставить свою in-memory БД до вызова init()
+    private var db: Database? = null
+
+    fun init() {
+        if (db == null) {
+            db = Database.connect(
+                url      = "jdbc:h2:file:./db/testdb;AUTO_SERVER=TRUE",
+                driver   = "org.h2.Driver",
+                user = "root",
+                password = ""
+            )
+        }
 
         try {
-            transaction(database) {
+            transaction(db!!) {
+                // Порядок важен: DisciplinesTable ссылается на UsersTable,
+                // NotesTable — на оба.
                 SchemaUtils.create(UsersTable)
                 SchemaUtils.create(UsersDataTable)
+                SchemaUtils.create(DisciplinesTable)
+                SchemaUtils.create(NotesTable)
             }
-        }catch (e: Exception){
+        } catch (e: Exception) {
             println("Error while creating tables:")
             e.printStackTrace()
         }
     }
 
-    // Функция для обёртки запросов
+    /**
+     * Только для тестов — заменяет файловую БД на переданную in-memory H2.
+     * Вызывай из initTestDatabase() ДО запуска приложения.
+     */
+    fun overrideDatabase(database: Database) {
+        db = database
+    }
+
     suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
+        newSuspendedTransaction(Dispatchers.IO, db) { block() }
 }

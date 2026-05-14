@@ -16,6 +16,15 @@ suspend fun isUserValid(userCredentials: UserCredentials): Boolean {
     }
 }
 
+suspend fun getUserIdByLogin(login: String): Int? {
+    return DatabaseFactory.dbQuery {
+        UsersTable.selectAll()
+            .where { UsersTable.username eq login }
+            .map { it[UsersTable.id] }
+            .firstOrNull()
+    }
+}
+
 suspend fun createUser(user: UserCredentials): Boolean {
     // Создает нового пользователя в базе данных
     val isUserCreated = DatabaseFactory.dbQuery {
