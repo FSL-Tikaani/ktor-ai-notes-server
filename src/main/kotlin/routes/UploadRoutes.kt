@@ -1,6 +1,7 @@
 package com.tikaani.routes
 
-import com.tikaani.services.getModifiedPhoto
+import com.tikaani.UploadWithTranscriptResponse
+import com.tikaani.services.extractTextFromOcrJson
 import com.tikaani.services.getOCRFromYandex
 import com.tikaani.services.uploadFileToServer
 import io.ktor.http.HttpStatusCode
@@ -9,8 +10,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
-
-
 
 fun Route.uploadRoutes() {
     post("/upload") {
@@ -40,11 +39,11 @@ suspend fun handleUploadWithTranscript(call: ApplicationCall) {
     }
 
     val statusOcr = getOCRFromYandex(statusUpload.fileName)
+    val ocrText = if (statusOcr.isSuccessfully) extractTextFromOcrJson(statusOcr.extractedText) else ""
 
-    if (statusOcr.isSuccessfully) {
-        getModifiedPhoto(statusOcr.extractedText, statusUpload.fileName)
-        call.respondText("OCR complete! Text: ${statusOcr.extractedText}")
-    } else {
-        call.respond(HttpStatusCode.BadRequest, "OCR failed: ${statusOcr.error}")
-    }
+    // Файл сохранён — возвращаем 200 даже если OCR не сработал
+    call.respond(UploadWithTranscriptResponse(
+        fileName = statusUpload.fileName,
+        ocrText  = ocrText,
+    ))
 }

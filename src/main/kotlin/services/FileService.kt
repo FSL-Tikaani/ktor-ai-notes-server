@@ -17,7 +17,9 @@ suspend fun uploadFileToServer(call: ApplicationCall): UploadFileStatus {
         multipartData.forEachPart { partData ->
             when (partData) {
                 is PartData.FileItem -> {
-                    val fileName = partData.originalFileName ?: UUID.randomUUID().toString()
+                    val ext = partData.originalFileName
+                        ?.substringAfterLast('.', "bin") ?: "bin"
+                    val fileName = "${UUID.randomUUID()}.$ext"
                     val uploadDir = File("UploadsData")
                     if (!uploadDir.exists()) {
                         uploadDir.mkdirs()

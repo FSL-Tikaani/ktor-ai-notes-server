@@ -29,6 +29,10 @@ object DatabaseFactory {
                 SchemaUtils.create(UsersDataTable)
                 SchemaUtils.create(DisciplinesTable)
                 SchemaUtils.create(NotesTable)
+                SchemaUtils.create(FavoritesTable)
+                // Добавляет новые колонки в уже существующие таблицы
+                SchemaUtils.createMissingTablesAndColumns(NotesTable)
+                SchemaUtils.createMissingTablesAndColumns(FavoritesTable)
             }
         } catch (e: Exception) {
             println("Error while creating tables:")

@@ -49,7 +49,11 @@ data class UserDataCredentials(
 @Serializable data class LineData(val boundingBox: BoundingBox)
 @Serializable data class TextAnnotationResponse(val result: Result)
 @Serializable data class Result(val textAnnotation: TextAnnotation)
-@Serializable data class TextAnnotation(val blocks: List<BlockData>)
+@Serializable data class FullTextAnnotation(val text: String = "")
+@Serializable data class TextAnnotation(
+    val blocks: List<BlockData> = emptyList(),
+    val fullTextAnnotation: FullTextAnnotation? = null,
+)
 
 // ─── Disciplines ──────────────────────────────────────────────────────────────
 
@@ -72,6 +76,20 @@ data class DisciplineResponse(
     val topics: List<String>,
 )
 
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+/** Запрос на форматирование/суммаризацию текста */
+@Serializable
+data class AiTextRequest(val rawText: String)
+
+/** Запрос на вопрос по конспекту */
+@Serializable
+data class AiAskRequest(val content: String, val question: String)
+
+/** Ответ от AI-эндпоинтов */
+@Serializable
+data class AiResponse(val result: String)
+
 // ─── Notes ───────────────────────────────────────────────────────────────────
 
 /**
@@ -86,6 +104,15 @@ data class CreateNoteRequest(
     val title: String,
     val content: String,
     val fileType: String,
+    val filePath: String? = null,
+    val isPublic: Boolean = false,
+)
+
+/** Ответ эндпоинта /upload-with-transcript */
+@Serializable
+data class UploadWithTranscriptResponse(
+    val fileName: String,
+    val ocrText: String,
 )
 
 /** Полное представление заметки, возвращаемое сервером */
@@ -98,5 +125,22 @@ data class NoteResponse(
     val title: String,
     val content: String,
     val fileType: String,
+    val filePath: String? = null,
     val createdAt: String,
+    val isPublic: Boolean = false,
+)
+
+/** Публичная заметка для раздела Сообщество */
+@Serializable
+data class CommunityNoteResponse(
+    val id: Int,
+    val disciplineId: Int,
+    val disciplineName: String,
+    val disciplineEmoji: String,
+    val disciplineColor: String,
+    val topic: String,
+    val title: String,
+    val authorName: String,
+    val createdAt: String,
+    val isFavorite: Boolean,
 )

@@ -1,5 +1,6 @@
 package com.tikaani.database
 
+import com.tikaani.CommunityNoteResponse
 import com.tikaani.CreateNoteRequest
 import com.tikaani.NoteResponse
 import org.jetbrains.exposed.sql.and
@@ -29,7 +30,9 @@ suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
             it[title]                   = request.title
             it[content]                 = request.content
             it[fileType]                = request.fileType
+            it[filePath]                = request.filePath
             it[createdAt]               = now
+            it[isPublic]                = request.isPublic
         }
 
         NoteResponse(
@@ -40,7 +43,9 @@ suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
             title          = request.title,
             content        = request.content,
             fileType       = request.fileType,
+            filePath       = request.filePath,
             createdAt      = now,
+            isPublic       = request.isPublic,
         )
     }
 }
@@ -65,7 +70,9 @@ suspend fun getNotesByUser(userId: Int): List<NoteResponse> {
                     title          = row[NotesTable.title],
                     content        = row[NotesTable.content],
                     fileType       = row[NotesTable.fileType],
+                    filePath       = row[NotesTable.filePath],
                     createdAt      = row[NotesTable.createdAt],
+                    isPublic       = row[NotesTable.isPublic],
                 )
             }
     }
@@ -91,7 +98,52 @@ suspend fun getNoteById(userId: Int, noteId: Int): NoteResponse? {
             title          = row[NotesTable.title],
             content        = row[NotesTable.content],
             fileType       = row[NotesTable.fileType],
+            filePath       = row[NotesTable.filePath],
             createdAt      = row[NotesTable.createdAt],
+            isPublic       = row[NotesTable.isPublic],
         )
+    }
+}
+
+/** Список всех публичных заметок, видимых в разделе «Сообщество». */
+suspend fun getPublicNotes(currentUserId: Int, searchQuery: String): List<CommunityNoteResponse> {
+    return DatabaseFactory.dbQuery {
+        NotesTable.selectAll()
+            .where { NotesTable.isPublic eq true }
+            .mapNotNull { row ->
+                val noteId   = row[NotesTable.id]
+                val discRow  = DisciplinesTable.selectAll()
+                    .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
+                    .firstOrNull()
+                val authorRow = UsersTable.selectAll()
+                    .where { UsersTable.id eq row[NotesTable.userId] }
+                    .firstOrNull()
+
+                val title    = row[NotesTable.title]
+                val topic    = row[NotesTable.topic]
+                val discName = discRow?.get(DisciplinesTable.name) ?: ""
+
+                if (searchQuery.isNotEmpty() &&
+                    !title.contains(searchQuery, ignoreCase = true) &&
+                    !topic.contains(searchQuery, ignoreCase = true) &&
+                    !discName.contains(searchQuery, ignoreCase = true)) return@mapNotNull null
+
+                val isFav = FavoritesTable.selectAll()
+                    .where { (FavoritesTable.userId eq currentUserId) and (FavoritesTable.noteId eq noteId) }
+                    .count() > 0
+
+                CommunityNoteResponse(
+                    id               = noteId,
+                    disciplineId     = row[NotesTable.disciplineId],
+                    disciplineName   = discName,
+                    disciplineEmoji  = discRow?.get(DisciplinesTable.emoji) ?: "⊛",
+                    disciplineColor  = discRow?.get(DisciplinesTable.color) ?: "amber",
+                    topic            = topic,
+                    title            = title,
+                    authorName       = authorRow?.get(UsersTable.username) ?: "unknown",
+                    createdAt        = row[NotesTable.createdAt],
+                    isFavorite       = isFav,
+                )
+            }
     }
 }

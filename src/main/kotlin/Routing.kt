@@ -1,6 +1,8 @@
 package com.tikaani
 
+import com.tikaani.routes.aiRoutes
 import com.tikaani.routes.authRoutes
+import com.tikaani.routes.communityRoutes
 import com.tikaani.routes.disciplineRoutes
 import com.tikaani.routes.handleRegistrationUserData
 import com.tikaani.routes.noteRoutes
@@ -32,6 +34,8 @@ fun Application.configureRouting() {
             uploadRoutes()
             disciplineRoutes()
             noteRoutes()
+            communityRoutes()
+            aiRoutes()
         }
     }
 }

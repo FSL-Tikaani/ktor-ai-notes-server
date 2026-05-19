@@ -4,6 +4,7 @@ import com.tikaani.BlockData
 import com.tikaani.GenerateBoxesStatus
 import com.tikaani.TextAnnotationResponse
 import com.tikaani.Vertex
+import com.tikaani.FullTextAnnotation
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -94,6 +95,18 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
     }
 
     return ocrStatus
+}
+
+/** Извлекает полный текст из JSON-ответа Яндекс OCR. */
+fun extractTextFromOcrJson(rawJson: String): String {
+    return try {
+        val json = Json { ignoreUnknownKeys = true }
+        val response = json.decodeFromString<TextAnnotationResponse>(rawJson)
+        response.result.textAnnotation.fullTextAnnotation?.text?.trim() ?: ""
+    } catch (e: Exception) {
+        println("OCR text extraction error: ${e.message}")
+        ""
+    }
 }
 
 fun drawBoundingBoxes(fileName: String, blocks: List<BlockData>): GenerateBoxesStatus{

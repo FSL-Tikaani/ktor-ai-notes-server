@@ -10,7 +10,9 @@ object NotesTable : Table("notes") {
     val title        = varchar("title", 300)
     val content      = text("content")
     val fileType     = varchar("file_type", 20)   // "photo" | "pdf" | "text"
+    val filePath     = varchar("file_path", 500).nullable()
     val createdAt    = varchar("created_at", 50)
+    val isPublic     = bool("is_public").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }
