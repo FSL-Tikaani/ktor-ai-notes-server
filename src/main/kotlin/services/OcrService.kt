@@ -7,14 +7,14 @@ import com.tikaani.Vertex
 import com.tikaani.FullTextAnnotation
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.serialization.gson.gson
+import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import java.awt.BasicStroke
 import java.awt.Color
@@ -43,49 +43,46 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
 
         val base64 = Base64.getEncoder().encodeToString(file.readBytes())
 
-        val client = HttpClient(CIO) {
-            install(ContentNegotiation) {
-                gson()
-            }
+        val ext = fileName.substringAfterLast('.', "jpg").lowercase()
+        val yandexMimeType = when (ext) {
+            "png"        -> "PNG"
+            "pdf"        -> "PDF"
+            "tiff", "tif"-> "TIFF"
+            "bmp"        -> "BMP"
+            "gif"        -> "GIF"
+            "webp"       -> "WEBP"
+            else         -> "JPEG"
         }
 
-        val dotenv = dotenv()
+        val client = HttpClient(CIO)
 
-        val IAM_TOKEN = dotenv["IAM_TOKEN"]
+        val dotenv = dotenv()
+        val API_KEY  = dotenv["YANDEX_API_KEY"]
         val FOLDER_ID = dotenv["FOLDER_ID"]
 
-        println(IAM_TOKEN)
-        println(FOLDER_ID)
-
+        val body = """{"mimeType":"$yandexMimeType","languageCodes":["ru","en"],"model":"handwritten","content":"$base64"}"""
 
         val response = client.post("https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText") {
             headers {
-                append("Authorization", "Bearer $IAM_TOKEN")
+                append("Authorization", "Api-Key $API_KEY")
                 append("x-folder-id", FOLDER_ID)
                 append("x-data-logging-enabled", "true")
-                append("Content-Type", "application/json")
             }
-            setBody(
-                mapOf(
-                    "mimeType" to "JPEG",
-                    "languageCodes" to listOf("ru", "en"),
-                    "model" to "handwritten",
-                    "content" to base64
-                )
-            )
+            contentType(ContentType.Application.Json)
+            setBody(body)
         }
 
-        println("Response status: ${response.status}")
+        println("OCR Response status: ${response.status}")
+
+        val responseText = response.bodyAsText()
 
         if (response.status != HttpStatusCode.OK) {
-            ocrStatus.error = "Error response, code: ${response.status.value}"
-            val errorBody = response.body<String>()
-
-            println("Error body: $errorBody")
+            ocrStatus.error = "OCR error ${response.status.value}: $responseText"
+            println("OCR Error body: $responseText")
             return ocrStatus
         }
 
-        val responseText = response.body<String>()
+        println("OCR Response body: $responseText")
         ocrStatus.isSuccessfully = true
         ocrStatus.extractedText = responseText
 
@@ -102,7 +99,9 @@ fun extractTextFromOcrJson(rawJson: String): String {
     return try {
         val json = Json { ignoreUnknownKeys = true }
         val response = json.decodeFromString<TextAnnotationResponse>(rawJson)
-        response.result.textAnnotation.fullTextAnnotation?.text?.trim() ?: ""
+        val fullText = response.result.textAnnotation.fullText.trim()
+        if (fullText.isNotEmpty()) return fullText
+        return response.result.textAnnotation.fullTextAnnotation?.text?.trim() ?: ""
     } catch (e: Exception) {
         println("OCR text extraction error: ${e.message}")
         ""

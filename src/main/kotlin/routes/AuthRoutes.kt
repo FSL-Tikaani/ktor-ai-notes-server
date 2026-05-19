@@ -69,7 +69,7 @@ fun createToken(user: UserCredentials): String {
         .withAudience(JwtConfig.audience)
         .withIssuer(JwtConfig.issuer)
         .withClaim("username", user.login)
-        .withExpiresAt(Date(System.currentTimeMillis() + 3_600_000)) // 1 час
+        .withExpiresAt(Date(System.currentTimeMillis() + 30L * 24 * 3_600_000)) // 30 дней
         .sign(Algorithm.HMAC256(JwtConfig.secretEncryptKey))
 }
 

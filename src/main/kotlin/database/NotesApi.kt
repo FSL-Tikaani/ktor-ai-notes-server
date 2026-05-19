@@ -39,6 +39,7 @@ suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
             id             = inserted[NotesTable.id],
             disciplineId   = request.disciplineId,
             disciplineName = discipline[DisciplinesTable.name],
+            disciplineColor = discipline[DisciplinesTable.color],
             topic          = request.topic,
             title          = request.title,
             content        = request.content,
@@ -57,50 +58,57 @@ suspend fun getNotesByUser(userId: Int): List<NoteResponse> {
             .where { NotesTable.userId eq userId }
             .orderBy(NotesTable.id to org.jetbrains.exposed.sql.SortOrder.DESC)
             .map { row ->
-                val discName = DisciplinesTable.selectAll()
+                val discRow = DisciplinesTable.selectAll()
                     .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
                     .firstOrNull()
-                    ?.get(DisciplinesTable.name) ?: ""
+                val discName  = discRow?.get(DisciplinesTable.name)  ?: ""
+                val discColor = discRow?.get(DisciplinesTable.color) ?: "amber"
 
                 NoteResponse(
-                    id             = row[NotesTable.id],
-                    disciplineId   = row[NotesTable.disciplineId],
-                    disciplineName = discName,
-                    topic          = row[NotesTable.topic],
-                    title          = row[NotesTable.title],
-                    content        = row[NotesTable.content],
-                    fileType       = row[NotesTable.fileType],
-                    filePath       = row[NotesTable.filePath],
-                    createdAt      = row[NotesTable.createdAt],
-                    isPublic       = row[NotesTable.isPublic],
+                    id              = row[NotesTable.id],
+                    disciplineId    = row[NotesTable.disciplineId],
+                    disciplineName  = discName,
+                    disciplineColor = discColor,
+                    topic           = row[NotesTable.topic],
+                    title           = row[NotesTable.title],
+                    content         = row[NotesTable.content],
+                    fileType        = row[NotesTable.fileType],
+                    filePath        = row[NotesTable.filePath],
+                    createdAt       = row[NotesTable.createdAt],
+                    isPublic        = row[NotesTable.isPublic],
                 )
             }
     }
 }
 
-/** Получить одну заметку по id (только если она принадлежит пользователю). */
+/** Получить одну заметку по id (своя или публичная). */
 suspend fun getNoteById(userId: Int, noteId: Int): NoteResponse? {
     return DatabaseFactory.dbQuery {
         val row = NotesTable.selectAll()
-            .where { (NotesTable.id eq noteId) and (NotesTable.userId eq userId) }
+            .where { NotesTable.id eq noteId }
             .firstOrNull() ?: return@dbQuery null
 
-        val discName = DisciplinesTable.selectAll()
+        // Разрешаем доступ только к своим или публичным конспектам
+        if (row[NotesTable.userId] != userId && !row[NotesTable.isPublic]) return@dbQuery null
+
+        val discRow2  = DisciplinesTable.selectAll()
             .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
             .firstOrNull()
-            ?.get(DisciplinesTable.name) ?: ""
+        val discName  = discRow2?.get(DisciplinesTable.name)  ?: ""
+        val discColor = discRow2?.get(DisciplinesTable.color) ?: "amber"
 
         NoteResponse(
-            id             = row[NotesTable.id],
-            disciplineId   = row[NotesTable.disciplineId],
-            disciplineName = discName,
-            topic          = row[NotesTable.topic],
-            title          = row[NotesTable.title],
-            content        = row[NotesTable.content],
-            fileType       = row[NotesTable.fileType],
-            filePath       = row[NotesTable.filePath],
-            createdAt      = row[NotesTable.createdAt],
-            isPublic       = row[NotesTable.isPublic],
+            id              = row[NotesTable.id],
+            disciplineId    = row[NotesTable.disciplineId],
+            disciplineName  = discName,
+            disciplineColor = discColor,
+            topic           = row[NotesTable.topic],
+            title           = row[NotesTable.title],
+            content         = row[NotesTable.content],
+            fileType        = row[NotesTable.fileType],
+            filePath        = row[NotesTable.filePath],
+            createdAt       = row[NotesTable.createdAt],
+            isPublic        = row[NotesTable.isPublic],
         )
     }
 }
@@ -140,6 +148,9 @@ suspend fun getPublicNotes(currentUserId: Int, searchQuery: String): List<Commun
                     disciplineColor  = discRow?.get(DisciplinesTable.color) ?: "amber",
                     topic            = topic,
                     title            = title,
+                    content          = row[NotesTable.content],
+                    fileType         = row[NotesTable.fileType],
+                    filePath         = row[NotesTable.filePath],
                     authorName       = authorRow?.get(UsersTable.username) ?: "unknown",
                     createdAt        = row[NotesTable.createdAt],
                     isFavorite       = isFav,

@@ -52,6 +52,7 @@ data class UserDataCredentials(
 @Serializable data class FullTextAnnotation(val text: String = "")
 @Serializable data class TextAnnotation(
     val blocks: List<BlockData> = emptyList(),
+    val fullText: String = "",
     val fullTextAnnotation: FullTextAnnotation? = null,
 )
 
@@ -121,6 +122,7 @@ data class NoteResponse(
     val id: Int,
     val disciplineId: Int,
     val disciplineName: String,
+    val disciplineColor: String = "amber",
     val topic: String,
     val title: String,
     val content: String,
@@ -140,6 +142,9 @@ data class CommunityNoteResponse(
     val disciplineColor: String,
     val topic: String,
     val title: String,
+    val content: String,
+    val fileType: String,
+    val filePath: String? = null,
     val authorName: String,
     val createdAt: String,
     val isFavorite: Boolean,
