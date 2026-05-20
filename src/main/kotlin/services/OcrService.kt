@@ -56,7 +56,7 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
 
         val client = HttpClient(CIO)
 
-        val dotenv = dotenv()
+        val dotenv = dotenv { ignoreIfMissing = true }
         val API_KEY  = dotenv["YANDEX_API_KEY"]
         val FOLDER_ID = dotenv["FOLDER_ID"]
 

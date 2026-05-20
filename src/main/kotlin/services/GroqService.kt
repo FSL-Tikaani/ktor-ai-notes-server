@@ -18,7 +18,9 @@ private val groqClient = HttpClient(CIO) {
     }
 }
 
-private val GROQ_API_KEY: String by lazy { dotenv()["GROQ_API_KEY"] }
+private val GROQ_API_KEY: String by lazy {
+    dotenv { ignoreIfMissing = true }["GROQ_API_KEY"]
+}
 
 private const val GROQ_MODEL = "llama-3.3-70b-versatile"
 private const val GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
