@@ -6,6 +6,7 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
@@ -58,7 +59,10 @@ private suspend fun callGroq(systemPrompt: String, userMessage: String): String 
                 )
             ))
         }
-        response.body<GroqResponse>().choices.firstOrNull()?.message?.content?.trim() ?: ""
+        val rawBody = response.bodyAsText()
+        println("Groq status: ${response.status}, body: $rawBody")
+        val json = Json { ignoreUnknownKeys = true }
+        json.decodeFromString<GroqResponse>(rawBody).choices.firstOrNull()?.message?.content?.trim() ?: ""
     } catch (e: Exception) {
         println("Groq error: ${e.message}")
         ""
