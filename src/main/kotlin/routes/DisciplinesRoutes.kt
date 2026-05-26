@@ -13,10 +13,12 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+// Ручки для дисциплин - получение списка и создание новой
 fun Route.disciplineRoutes() {
 
-    /** GET /disciplines — список дисциплин текущего пользователя */
+    // Список дисциплин текущего юзера
     get("/disciplines") {
+        // Достаем username из токена - id юзера в JWT не кладем, поэтому потом еще ищем в БД
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
             ?: return@get call.respond(HttpStatusCode.Unauthorized)
@@ -27,7 +29,7 @@ fun Route.disciplineRoutes() {
         call.respond(getDisciplinesByUser(userId))
     }
 
-    /** POST /disciplines — создать дисциплину */
+    // Создание дисциплины
     post("/disciplines") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -36,6 +38,7 @@ fun Route.disciplineRoutes() {
         val userId = getUserIdByUsername(username)
             ?: return@post call.respond(HttpStatusCode.Unauthorized, "User not found")
 
+        // Если json кривой - сразу 400, чтобы не валиться в 500 ниже
         val request = try {
             call.receive<DisciplineRequest>()
         } catch (e: Exception) {

@@ -13,9 +13,10 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+// Раздел "Сообщество" - публичные конспекты других юзеров и избранное
 fun Route.communityRoutes() {
 
-    /** GET /community/notes?q= — публичные конспекты (с поиском) */
+    // Список публичных конспектов. q= - подстрока для поиска (по названию/теме/дисциплине)
     get("/community/notes") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -24,11 +25,12 @@ fun Route.communityRoutes() {
         val userId = getUserIdByUsername(username)
             ?: return@get call.respond(HttpStatusCode.Unauthorized, "User not found")
 
+        // Пустая q = просто отдаем всё
         val query = call.request.queryParameters["q"] ?: ""
         call.respond(getPublicNotes(userId, query))
     }
 
-    /** POST /community/favorites/{noteId} — добавить в избранное */
+    // Добавить заметку в избранное
     post("/community/favorites/{noteId}") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -44,7 +46,7 @@ fun Route.communityRoutes() {
         call.respond(HttpStatusCode.OK)
     }
 
-    /** DELETE /community/favorites/{noteId} — убрать из избранного */
+    // Убрать из избранного
     delete("/community/favorites/{noteId}") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()

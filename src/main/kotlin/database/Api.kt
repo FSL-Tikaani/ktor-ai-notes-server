@@ -7,8 +7,9 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 
 
+// Проверяет логин/пароль при входе. Тупой матчинг по двум полям -
+// пароль пока хранится как есть, потом нужно перевести на хеш
 suspend fun isUserValid(userCredentials: UserCredentials): Boolean {
-    // Возвращает true, если пользователь существует в базе данных
     return DatabaseFactory.dbQuery {
         UsersTable.selectAll().where {
             (UsersTable.username eq userCredentials.login) and (UsersTable.password eq userCredentials.password)
@@ -16,6 +17,8 @@ suspend fun isUserValid(userCredentials: UserCredentials): Boolean {
     }
 }
 
+// Достает id юзера по логину - нужен почти везде после авторизации,
+// потому что в JWT хранится только username
 suspend fun getUserIdByLogin(login: String): Int? {
     return DatabaseFactory.dbQuery {
         UsersTable.selectAll()
@@ -25,20 +28,22 @@ suspend fun getUserIdByLogin(login: String): Int? {
     }
 }
 
+// Создает запись о юзере при регистрации
 suspend fun createUser(user: UserCredentials): Boolean {
-    // Создает нового пользователя в базе данных
     val isUserCreated = DatabaseFactory.dbQuery {
         val insertStatement = UsersTable.insert {
             it[username] = user.login
             it[password] = user.password
         }
-        // Возвращает true, если количество вставленных строк больше 0
+        // insertedCount > 0 значит реально вставилось
         insertStatement.insertedCount > 0
     }
 
     return isUserCreated;
 }
 
+// Заполняет профиль юзера после регистрации (имя, фамилия, курс и тд).
+// userId приходит уже готовый - его извлекаем из JWT в роуте
 suspend fun createUserData(userData: UserDataCredentials,  userId: Int): Boolean {
     val isUserDataCreated = DatabaseFactory.dbQuery {
         val insertStatement = UsersDataTable.insert {

@@ -14,9 +14,10 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+// Ручки для работы с конспектами (CRUD без update/delete пока)
 fun Route.noteRoutes() {
 
-    /** GET /notes — все заметки текущего пользователя */
+    // Все конспекты текущего юзера
     get("/notes") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -28,7 +29,7 @@ fun Route.noteRoutes() {
         call.respond(getNotesByUser(userId))
     }
 
-    /** GET /notes/{id} — одна заметка */
+    // Конкретный конспект по id - своя или публичная
     get("/notes/{id}") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -40,13 +41,14 @@ fun Route.noteRoutes() {
         val noteId = call.parameters["id"]?.toIntOrNull()
             ?: return@get call.respond(HttpStatusCode.BadRequest, "Invalid note id")
 
+        // getNoteById сам проверит доступ - чужие приватные вернет как null
         val note = getNoteById(userId, noteId)
             ?: return@get call.respond(HttpStatusCode.NotFound, "Note not found")
 
         call.respond(note)
     }
 
-    /** POST /notes — создать заметку */
+    // Создание новой заметки
     post("/notes") {
         val username = call.principal<JWTPrincipal>()
             ?.payload?.getClaim("username")?.asString()
@@ -65,6 +67,7 @@ fun Route.noteRoutes() {
             return@post call.respond(HttpStatusCode.BadRequest, "Title and content cannot be blank")
         }
 
+        // null от createNote = пытались создать заметку в чужой дисциплине (или её нет)
         val created = createNote(userId, request)
             ?: return@post call.respond(HttpStatusCode.BadRequest, "Discipline not found or access denied")
 

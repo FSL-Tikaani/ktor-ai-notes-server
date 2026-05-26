@@ -11,9 +11,11 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
+// Ручки для всех ИИ-фишек - форматирование, сжатие, вопросы к конспекту
 fun Route.aiRoutes() {
 
-    /** POST /ai/format — форматирует сырой OCR-текст в красивый конспект */
+    // Берем сырой текст из OCR и просим ИИ сделать из него нормальный конспект
+    // (заголовки, исправить ошибки распознавания и тд)
     post("/ai/format") {
         val request = call.receive<AiTextRequest>()
         if (request.rawText.isBlank()) {
@@ -24,7 +26,7 @@ fun Route.aiRoutes() {
         call.respond(AiResponse(result))
     }
 
-    /** POST /ai/summarize — краткая сводка конспекта */
+    // Короткая выжимка из конспекта - буллетами
     post("/ai/summarize") {
         val request = call.receive<AiTextRequest>()
         if (request.rawText.isBlank()) {
@@ -35,7 +37,8 @@ fun Route.aiRoutes() {
         call.respond(AiResponse(result))
     }
 
-    /** POST /ai/ask — вопрос к ИИ по конспекту */
+    // Юзер задает вопрос - ИИ отвечает по содержимому конспекта.
+    // content приходит с клиента вместе с вопросом - чтобы не дергать БД лишний раз
     post("/ai/ask") {
         val request = call.receive<AiAskRequest>()
         if (request.content.isBlank() || request.question.isBlank()) {

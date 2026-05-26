@@ -14,15 +14,17 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.io.File
 
+// Тут собираем все маршруты приложения в одно дерево
 fun Application.configureRouting() {
     routing {
-        // Без авторизации
+        // Открытые ручки - без токена
         get("/") {
             call.respondText("Server is running!")
         }
         authRoutes()
 
-        // Раздача загруженных файлов (фото/pdf) без авторизации
+        // Отдача загруженных файлов (фото и pdf конспектов).
+        // Без авторизации - чтобы картинки можно было показывать через обычный Image-loader
         get("/files/{fileName}") {
             val fileName = call.parameters["fileName"]
                 ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing file name")
@@ -31,12 +33,14 @@ fun Application.configureRouting() {
             call.respondFile(file)
         }
 
-        // Только с авторизацией
+        // Все что ниже - только для залогиненых, проверяем JWT
         authenticate("auth-jwt") {
+            // Простой пинг для клиента - проверить что токен еще живой
             get("/auth/check-token") {
                 call.respond(HttpStatusCode.OK)
             }
 
+            // Заполнение профиля идет уже после регистрации, поэтому за JWT
             post("auth/registerUserData") {
                 handleRegistrationUserData(call)
             }

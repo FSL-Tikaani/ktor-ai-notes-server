@@ -10,6 +10,7 @@ import io.ktor.server.application.ApplicationCall
 import java.io.File
 import java.util.UUID
 
+// Принимает multipart-запрос с файлом и сохраняет его в UploadsData/
 suspend fun uploadFileToServer(call: ApplicationCall): UploadFileStatus {
     val status = UploadFileStatus()
     try {
@@ -17,6 +18,8 @@ suspend fun uploadFileToServer(call: ApplicationCall): UploadFileStatus {
         multipartData.forEachPart { partData ->
             when (partData) {
                 is PartData.FileItem -> {
+                    // Достаем расширение из исходного имени или ставим "bin" если ничего нет.
+                    // Само имя генерим как UUID - чтобы файлы не затирали друг друга
                     val ext = partData.originalFileName
                         ?.substringAfterLast('.', "bin") ?: "bin"
                     val fileName = "${UUID.randomUUID()}.$ext"
@@ -26,12 +29,14 @@ suspend fun uploadFileToServer(call: ApplicationCall): UploadFileStatus {
                     }
 
                     val file = File(uploadDir, fileName)
+                    // Поточная копия чтобы не держать большой файл в памяти
                     partData.provider().copyAndClose(file.writeChannel())
 
                     status.isSuccessfully = true
                     status.fileName = fileName
                 }
                 else -> {
+                    // Текстовые поля и прочее в этом эндпоинте не используем
                     status.error = "Error type of partData"
                 }
             }

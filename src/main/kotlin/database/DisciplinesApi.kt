@@ -5,7 +5,8 @@ import com.tikaani.DisciplineResponse
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 
-/** Получить ID пользователя по username (из JWT-claim). */
+// То же самое что getUserIdByLogin - дубль, оставлен для удобства роутов
+// (там везде берут username из JWT-claim, поэтому функция называется так же как и claim)
 suspend fun getUserIdByUsername(username: String): Int? {
     return DatabaseFactory.dbQuery {
         UsersTable.selectAll()
@@ -15,7 +16,8 @@ suspend fun getUserIdByUsername(username: String): Int? {
     }
 }
 
-/** Список всех дисциплин пользователя с количеством заметок и уникальными темами. */
+// Тянет все дисциплины юзера и считает заметки и темы по каждой.
+// Делается через N+1 запросов - не очень эффективно, но дисциплин обычно мало
 suspend fun getDisciplinesByUser(userId: Int): List<DisciplineResponse> {
     return DatabaseFactory.dbQuery {
         DisciplinesTable.selectAll()
@@ -23,13 +25,13 @@ suspend fun getDisciplinesByUser(userId: Int): List<DisciplineResponse> {
             .map { row ->
                 val discId = row[DisciplinesTable.id]
 
-                // Количество заметок в этой дисциплине
+                // Считаем сколько заметок в этой дисциплине - покажем на карточке
                 val notesCount = NotesTable.selectAll()
                     .where { NotesTable.disciplineId eq discId }
                     .count()
                     .toInt()
 
-                // Уникальные темы из заметок этой дисциплины
+                // Собираем уникальные темы - на клиенте показываем как чипы
                 val topics = NotesTable.selectAll()
                     .where { NotesTable.disciplineId eq discId }
                     .map { it[NotesTable.topic] }
@@ -47,7 +49,7 @@ suspend fun getDisciplinesByUser(userId: Int): List<DisciplineResponse> {
     }
 }
 
-/** Создать новую дисциплину и вернуть её полное представление. */
+// Создает дисциплину и сразу возвращает её клиенту (с notesCount=0 и без тем)
 suspend fun createDiscipline(userId: Int, request: DisciplineRequest): DisciplineResponse? {
     return DatabaseFactory.dbQuery {
         val inserted = DisciplinesTable.insert {

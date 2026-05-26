@@ -9,12 +9,15 @@ import org.jetbrains.exposed.sql.selectAll
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+// Формат хранения даты в БД - чтобы на клиенте было легко парсить
 private val FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
-/** Создать заметку и вернуть её полное представление. */
+// Создает заметку. Возвращает null если дисциплина чужая или не нашлась -
+// так роут понимает что нужно отдать 400 а не 500
 suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
     return DatabaseFactory.dbQuery {
-        // Проверяем, что дисциплина принадлежит этому пользователю
+        // Проверяем что дисциплина существует и принадлежит этому юзеру.
+        // Без этого можно было бы создавать заметки в чужих дисциплинах подменив id
         val discipline = DisciplinesTable.selectAll()
             .where { DisciplinesTable.id eq request.disciplineId }
             .firstOrNull() ?: return@dbQuery null
@@ -35,6 +38,7 @@ suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
             it[isPublic]                = request.isPublic
         }
 
+        // Сразу собираем готовый респонс - клиенту так удобнее, не нужен второй GET
         NoteResponse(
             id             = inserted[NotesTable.id],
             disciplineId   = request.disciplineId,
@@ -51,13 +55,15 @@ suspend fun createNote(userId: Int, request: CreateNoteRequest): NoteResponse? {
     }
 }
 
-/** Список всех заметок пользователя (без content, для списка). */
+// Все заметки юзера - используется на главной и в списке "Все конспекты".
+// Сортируем по id DESC чтобы свежие были сверху
 suspend fun getNotesByUser(userId: Int): List<NoteResponse> {
     return DatabaseFactory.dbQuery {
         NotesTable.selectAll()
             .where { NotesTable.userId eq userId }
             .orderBy(NotesTable.id to org.jetbrains.exposed.sql.SortOrder.DESC)
             .map { row ->
+                // Подтягиваем имя и цвет дисциплины - чтобы на карточке заметки сразу было видно
                 val discRow = DisciplinesTable.selectAll()
                     .where { DisciplinesTable.id eq row[NotesTable.disciplineId] }
                     .firstOrNull()
@@ -81,14 +87,15 @@ suspend fun getNotesByUser(userId: Int): List<NoteResponse> {
     }
 }
 
-/** Получить одну заметку по id (своя или публичная). */
+// Одна заметка по id. Отдаем её если это своя или если публичная -
+// иначе null и роут вернет 404
 suspend fun getNoteById(userId: Int, noteId: Int): NoteResponse? {
     return DatabaseFactory.dbQuery {
         val row = NotesTable.selectAll()
             .where { NotesTable.id eq noteId }
             .firstOrNull() ?: return@dbQuery null
 
-        // Разрешаем доступ только к своим или публичным конспектам
+        // Чужие приватные заметки прячем
         if (row[NotesTable.userId] != userId && !row[NotesTable.isPublic]) return@dbQuery null
 
         val discRow2  = DisciplinesTable.selectAll()
@@ -113,7 +120,9 @@ suspend fun getNoteById(userId: Int, noteId: Int): NoteResponse? {
     }
 }
 
-/** Список всех публичных заметок, видимых в разделе «Сообщество». */
+// Все публичные заметки для раздела "Сообщество".
+// searchQuery - подстрока для фильтра по названию/теме/дисциплине.
+// currentUserId нужен чтобы проставить флажок "в избранном" для каждой карточки
 suspend fun getPublicNotes(currentUserId: Int, searchQuery: String): List<CommunityNoteResponse> {
     return DatabaseFactory.dbQuery {
         NotesTable.selectAll()
@@ -131,11 +140,14 @@ suspend fun getPublicNotes(currentUserId: Int, searchQuery: String): List<Commun
                 val topic    = row[NotesTable.topic]
                 val discName = discRow?.get(DisciplinesTable.name) ?: ""
 
+                // Простая фильтрация по подстроке - ищем в названии, теме и имени дисциплины.
+                // Регистр игнорируем чтобы поиск был "человеческий"
                 if (searchQuery.isNotEmpty() &&
                     !title.contains(searchQuery, ignoreCase = true) &&
                     !topic.contains(searchQuery, ignoreCase = true) &&
                     !discName.contains(searchQuery, ignoreCase = true)) return@mapNotNull null
 
+                // Проверяем у себя ли в избранном - чтобы на клиенте сердечко было заполненое
                 val isFav = FavoritesTable.selectAll()
                     .where { (FavoritesTable.userId eq currentUserId) and (FavoritesTable.noteId eq noteId) }
                     .count() > 0

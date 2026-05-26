@@ -1,11 +1,11 @@
 package com.tikaani.services
 
 import com.tikaani.BlockData
+import com.tikaani.Env
 import com.tikaani.GenerateBoxesStatus
 import com.tikaani.TextAnnotationResponse
 import com.tikaani.Vertex
 import com.tikaani.FullTextAnnotation
-import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.headers
@@ -25,12 +25,15 @@ import java.util.Base64
 import javax.imageio.ImageIO
 import kotlin.collections.forEach
 
+// Дублирующий контейнер - можно было бы использовать тот что в Models.kt,
+// но тут он private к этому сервису и менее громоздкий
 data class OCRStatus(
     var isSuccessfully: Boolean = false,
     var extractedText: String = "",
     var error: String = ""
 )
 
+// Отправляет файл в Яндекс OCR и забирает у них JSON с распознанным текстом
 suspend fun getOCRFromYandex(fileName: String): OCRStatus {
     val ocrStatus = OCRStatus()
 
@@ -41,8 +44,11 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
             return ocrStatus
         }
 
+        // Яндекс API принимает файл только base64 в теле json
         val base64 = Base64.getEncoder().encodeToString(file.readBytes())
 
+        // Маппинг расширения в формат который ожидает Яндекс (PNG/PDF/...).
+        // По умолчанию JPEG - покрывает большинство фото с телефона
         val ext = fileName.substringAfterLast('.', "jpg").lowercase()
         val yandexMimeType = when (ext) {
             "png"        -> "PNG"
@@ -56,17 +62,19 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
 
         val client = HttpClient(CIO)
 
-        val dotenv = dotenv { ignoreIfMissing = true }
-        val API_KEY  = dotenv["YANDEX_API_KEY"]
-        val FOLDER_ID = dotenv["FOLDER_ID"]
+        val apiKey   = Env.require("YANDEX_API_KEY")
+        val folderId = Env.require("FOLDER_ID")
+        // По умолчанию false - чтобы Яндекс не сохранял наши картинки у себя
+        val logData  = Env.getBool("YANDEX_OCR_LOG_DATA", false)
 
+        // model=handwritten - заточена под рукописный текст
         val body = """{"mimeType":"$yandexMimeType","languageCodes":["ru","en"],"model":"handwritten","content":"$base64"}"""
 
         val response = client.post("https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText") {
             headers {
-                append("Authorization", "Api-Key $API_KEY")
-                append("x-folder-id", FOLDER_ID)
-                append("x-data-logging-enabled", "true")
+                append("Authorization", "Api-Key $apiKey")
+                append("x-folder-id", folderId)
+                append("x-data-logging-enabled", logData.toString())
             }
             contentType(ContentType.Application.Json)
             setBody(body)
@@ -84,6 +92,7 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
 
         println("OCR Response body: $responseText")
         ocrStatus.isSuccessfully = true
+        // Сюда кладем сырой json - дальше его уже парсит extractTextFromOcrJson
         ocrStatus.extractedText = responseText
 
     } catch (e: Exception) {
@@ -94,7 +103,8 @@ suspend fun getOCRFromYandex(fileName: String): OCRStatus {
     return ocrStatus
 }
 
-/** Извлекает полный текст из JSON-ответа Яндекс OCR. */
+// Достает из json-ответа Яндекса распознанный текст одной строкой.
+// fullText есть не всегда - на этот случай смотрим в fullTextAnnotation
 fun extractTextFromOcrJson(rawJson: String): String {
     return try {
         val json = Json { ignoreUnknownKeys = true }
@@ -108,21 +118,22 @@ fun extractTextFromOcrJson(rawJson: String): String {
     }
 }
 
+// Рисует на картинке красные рамки вокруг блоков и строк распознанного текста.
+// В рантайме не используется - оставлено для отладки чтобы посмотреть что вообще нашел OCR
 fun drawBoundingBoxes(fileName: String, blocks: List<BlockData>): GenerateBoxesStatus{
     val status = GenerateBoxesStatus()
     try {
         val image: BufferedImage = ImageIO.read(File("UploadsData/$fileName"))
         val graphics: Graphics2D = image.createGraphics()
 
-        // Настройки рисования
         graphics.color = Color.RED
         graphics.stroke = BasicStroke(1.0f)
 
         blocks.forEach { block ->
-            // Рисуем boundingBox для блока
+            // Сначала рамка вокруг всего блока
             drawPolygon(graphics, block.boundingBox.vertices)
 
-            // Рисуем boundingBox для каждой линии
+            // Потом мелкие рамки на каждую строку внутри блока
             block.lines.forEach { line ->
                 drawPolygon(graphics, line.boundingBox.vertices)
             }
@@ -139,8 +150,8 @@ fun drawBoundingBoxes(fileName: String, blocks: List<BlockData>): GenerateBoxesS
     return status
 }
 
+// Удобная обертка - парсит json и сразу рисует рамки. Тоже для отладки
 fun getModifiedPhoto(extractedText: String, fileName: String){
-    // Парсим JSON ответ от API
     val jsonString = extractedText
 
     val jsonParser = Json {
@@ -149,10 +160,8 @@ fun getModifiedPhoto(extractedText: String, fileName: String){
 
     val ocrResponse = jsonParser.decodeFromString<TextAnnotationResponse>(jsonString)
 
-    // Получаем блоки данных
     val blocks = ocrResponse.result.textAnnotation.blocks
 
-    // Вызываем функцию рисования
     val result = drawBoundingBoxes(fileName, blocks)
 
     if (result.isSuccessfully) {
@@ -163,6 +172,7 @@ fun getModifiedPhoto(extractedText: String, fileName: String){
 }
 
 
+// Маленький хелпер - превращает список вершин в полигон на Graphics2D
 private fun drawPolygon(graphics: Graphics2D, vertices: List<Vertex>) {
     val xPoints = vertices.map { it.x.toInt() }.toIntArray()
     val yPoints = vertices.map { it.y.toInt() }.toIntArray()

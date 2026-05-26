@@ -2,33 +2,36 @@ package com.tikaani
 
 import kotlinx.serialization.Serializable
 
-// ─── Upload / OCR helpers ────────────────────────────────────────────────────
+// Все DTO собраны в одном файле чтобы не плодить пачку мелких файлов
 
+// Статус загрузки файла на сервер - возвращается из uploadFileToServer
 data class UploadFileStatus(
     var isSuccessfully: Boolean = false,
     var fileName: String = "",
     var error: String = "",
 )
 
+// Результат распознавания текста с фото через Яндекс OCR
 data class OCRStatus(
     var isSuccessfully: Boolean = false,
     var extractedText: String = "",
     var error: String = "",
 )
 
+// Использовался когда рисовали bounding-boxes поверх фото для отладки OCR
 data class GenerateBoxesStatus(
     var isSuccessfully: Boolean = false,
     var error: String = "",
 )
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
-
+// Логин/пароль для регистрации и входа
 @Serializable
 data class UserCredentials(
     val login: String,
     val password: String,
 )
 
+// Профиль пользователя - имя, курс и счетчики. Заполняется после регистрации
 @Serializable
 data class UserDataCredentials(
     val id: Int,
@@ -41,8 +44,7 @@ data class UserDataCredentials(
     val numberNotes: Int,
 )
 
-// ─── OCR / Yandex Vision types ───────────────────────────────────────────────
-
+// Структуры под ответ Яндекс Vision OCR - вершины, рамки и блоки текста
 @Serializable data class Vertex(val x: String, val y: String)
 @Serializable data class BoundingBox(val vertices: List<Vertex>)
 @Serializable data class BlockData(val boundingBox: BoundingBox, val lines: List<LineData>)
@@ -53,20 +55,19 @@ data class UserDataCredentials(
 @Serializable data class TextAnnotation(
     val blocks: List<BlockData> = emptyList(),
     val fullText: String = "",
+    // fullTextAnnotation - запасной вариант, иногда Яндекс кладет весь текст сюда
     val fullTextAnnotation: FullTextAnnotation? = null,
 )
 
-// ─── Disciplines ──────────────────────────────────────────────────────────────
-
-/** Тело запроса на создание дисциплины */
+// Что приходит с клиента при создании новой дисциплины
 @Serializable
 data class DisciplineRequest(
     val name: String,
-    val color: String,   // e.g. "purple", "amber", "blue", …
-    val emoji: String,   // e.g. "∑", "φ", "⊛", …
+    val color: String,   // строкой ("purple", "blue" и тд) - на клиенте мапится в цвет
+    val emoji: String,   // символ для иконки дисциплины
 )
 
-/** Ответ при получении / создании дисциплины */
+// Дисциплина которую отдаем на клиент - сразу с счетчиком заметок и списком тем
 @Serializable
 data class DisciplineResponse(
     val id: Int,
@@ -77,27 +78,21 @@ data class DisciplineResponse(
     val topics: List<String>,
 )
 
-// ─── AI ──────────────────────────────────────────────────────────────────────
-
-/** Запрос на форматирование/суммаризацию текста */
+// Запрос на форматирование или сжатие текста через ИИ
 @Serializable
 data class AiTextRequest(val rawText: String)
 
-/** Запрос на вопрос по конспекту */
+// Запрос "задай вопрос к конспекту" - кидаем сам конспект и вопрос
 @Serializable
 data class AiAskRequest(val content: String, val question: String)
 
-/** Ответ от AI-эндпоинтов */
+// Универсальный ответ от ИИ-эндпоинтов
 @Serializable
 data class AiResponse(val result: String)
 
-// ─── Notes ───────────────────────────────────────────────────────────────────
-
-/**
- * Тело POST /notes.
- * content — итоговый текст заметки (после OCR+LLM или прямой ввод).
- * fileType — "photo" | "pdf" | "text"
- */
+// Тело запроса на создание заметки.
+// content - финальный текст (после OCR + ИИ или просто ввод руками)
+// fileType - "photo" / "pdf" / "text" - чтобы клиент знал как показывать
 @Serializable
 data class CreateNoteRequest(
     val disciplineId: Int,
@@ -109,14 +104,14 @@ data class CreateNoteRequest(
     val isPublic: Boolean = false,
 )
 
-/** Ответ эндпоинта /upload-with-transcript */
+// Ответ на /upload-with-transcript - имя сохраненного файла + распознанный текст
 @Serializable
 data class UploadWithTranscriptResponse(
     val fileName: String,
     val ocrText: String,
 )
 
-/** Полное представление заметки, возвращаемое сервером */
+// Полная заметка - то что видит юзер на детальном экране
 @Serializable
 data class NoteResponse(
     val id: Int,
@@ -132,7 +127,7 @@ data class NoteResponse(
     val isPublic: Boolean = false,
 )
 
-/** Публичная заметка для раздела Сообщество */
+// Тоже заметка, но для раздела "Сообщество" - тут еще автор и флаг "в избранном"
 @Serializable
 data class CommunityNoteResponse(
     val id: Int,
