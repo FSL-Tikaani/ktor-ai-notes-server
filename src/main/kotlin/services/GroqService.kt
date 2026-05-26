@@ -2,69 +2,78 @@ package com.tikaani.services
 
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private val groqClient = HttpClient(CIO) {
+private val yandexClient = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
     }
 }
 
-private val GROQ_API_KEY: String by lazy {
-    dotenv { ignoreIfMissing = true }["GROQ_API_KEY"]
-}
+private val env by lazy { dotenv { ignoreIfMissing = true } }
+private val YANDEX_API_KEY: String by lazy { env["YANDEX_API_KEY"] }
+private val FOLDER_ID: String by lazy { env["FOLDER_ID"] }
 
-private const val GROQ_MODEL = "llama-3.1-8b-instant"
-private const val GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
+private const val YANDEX_GPT_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
-// ─── Внутренние модели Groq API ───────────────────────────────────────────────
-
-@Serializable
-private data class GroqMessage(val role: String, val content: String)
+// ─── Модели YandexGPT API ─────────────────────────────────────────────────────
 
 @Serializable
-private data class GroqRequestBody(
-    val model: String,
-    val messages: List<GroqMessage>,
+private data class YandexMessage(val role: String, val text: String)
+
+@Serializable
+private data class YandexCompletionOptions(
+    val stream: Boolean = false,
     val temperature: Double = 0.7,
+    val maxTokens: Int = 2000
 )
 
 @Serializable
-private data class GroqChoice(val message: GroqMessage)
+private data class YandexRequestBody(
+    val modelUri: String,
+    val completionOptions: YandexCompletionOptions,
+    val messages: List<YandexMessage>
+)
 
 @Serializable
-private data class GroqResponse(val choices: List<GroqChoice>)
+private data class YandexAlternative(val message: YandexMessage)
+
+@Serializable
+private data class YandexResult(val alternatives: List<YandexAlternative>)
+
+@Serializable
+private data class YandexResponse(val result: YandexResult)
 
 // ─── Базовая функция вызова ───────────────────────────────────────────────────
 
-private suspend fun callGroq(systemPrompt: String, userMessage: String): String {
+private suspend fun callYandexGPT(systemPrompt: String, userMessage: String): String {
     return try {
-        val response = groqClient.post(GROQ_URL) {
-            header("Authorization", "Bearer $GROQ_API_KEY")
+        val response = yandexClient.post(YANDEX_GPT_URL) {
+            header("Authorization", "Api-Key $YANDEX_API_KEY")
             contentType(ContentType.Application.Json)
-            setBody(GroqRequestBody(
-                model    = GROQ_MODEL,
+            setBody(YandexRequestBody(
+                modelUri = "gpt://$FOLDER_ID/yandexgpt-lite",
+                completionOptions = YandexCompletionOptions(),
                 messages = listOf(
-                    GroqMessage("system", systemPrompt),
-                    GroqMessage("user",   userMessage),
+                    YandexMessage("system", systemPrompt),
+                    YandexMessage("user", userMessage)
                 )
             ))
         }
         val rawBody = response.bodyAsText()
-        println("Groq status: ${response.status}, body: $rawBody")
+        println("YandexGPT status: ${response.status}, body: $rawBody")
         val json = Json { ignoreUnknownKeys = true }
-        json.decodeFromString<GroqResponse>(rawBody).choices.firstOrNull()?.message?.content?.trim() ?: ""
+        json.decodeFromString<YandexResponse>(rawBody)
+            .result.alternatives.firstOrNull()?.message?.text?.trim() ?: ""
     } catch (e: Exception) {
-        println("Groq error: ${e.message}")
+        println("YandexGPT error: ${e.message}")
         ""
     }
 }
@@ -74,7 +83,7 @@ private suspend fun callGroq(systemPrompt: String, userMessage: String): String 
 /**
  * Принимает сырой OCR-текст и возвращает красивый структурированный конспект.
  */
-suspend fun formatNoteWithAi(rawText: String): String = callGroq(
+suspend fun formatNoteWithAi(rawText: String): String = callYandexGPT(
     systemPrompt = """Ты ассистент студента. Тебе дан сырой текст после OCR-распознавания рукописи или PDF.
 Твоя задача — преобразовать его в чистый, структурированный конспект:
 - Исправь ошибки и артефакты OCR
@@ -88,7 +97,7 @@ suspend fun formatNoteWithAi(rawText: String): String = callGroq(
 /**
  * Генерирует краткую сводку конспекта (3–5 ключевых пунктов).
  */
-suspend fun summarizeNote(content: String): String = callGroq(
+suspend fun summarizeNote(content: String): String = callYandexGPT(
     systemPrompt = """Ты ассистент студента. Создай краткую сводку конспекта в виде 3–5 ключевых пунктов.
 Каждый пункт начинай с "• ". Будь лаконичен. Сохрани язык конспекта.
 Верни только список пунктов без заголовков и пояснений.""",
@@ -98,7 +107,7 @@ suspend fun summarizeNote(content: String): String = callGroq(
 /**
  * Отвечает на вопрос студента строго по содержанию конспекта.
  */
-suspend fun askAboutNote(content: String, question: String): String = callGroq(
+suspend fun askAboutNote(content: String, question: String): String = callYandexGPT(
     systemPrompt = """Ты ассистент студента. Отвечай на вопросы строго по содержанию конспекта ниже.
 Если ответ не содержится в конспекте — честно скажи об этом.
 Отвечай на том же языке, на котором задан вопрос. Будь конкретен и понятен.
